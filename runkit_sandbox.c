@@ -3,6 +3,7 @@
   | PHP Version 7                                                        |
   +----------------------------------------------------------------------+
   | Copyright (c) 1997-2006 The PHP Group, (c) 2008-2015 Dmitry Zenovich |
+  | "runkit7" patches (c) 2015-2017 Tyson Andre                          |
   +----------------------------------------------------------------------+
   | This source file is subject to the new BSD license,                  |
   | that is bundled with this package in the file LICENSE, and is        |
@@ -10,11 +11,12 @@
   | http://www.opensource.org/licenses/BSD-3-Clause                      |
   | If you did not receive a copy of the license and are unable to       |
   | obtain it through the world-wide-web, please send a note to          |
-  | dzenovich@gmail.com so we can mail you a copy immediately.           |
+  | license@php.net so we can mail you a copy immediately.               |
   +----------------------------------------------------------------------+
   | Author: Sara Golemon <pollita@php.net>                               |
   | Props:  Wez Furlong                                                  |
   | Modified by Dmitry Zenovich <dzenovich@gmail.com>                    |
+  | Modified for php7 by Tyson Andre <tysonandre775@hotmail.com>         |
   +----------------------------------------------------------------------+
 */
 
@@ -25,10 +27,12 @@
 
 #ifdef PHP_RUNKIT_SANDBOX
 #include "SAPI.h"
+#include "TSRM.h"
 #include "php_main.h"
 #include "php_runkit_sandbox.h"
 #include "php_runkit_zval.h"
 
+#if 0
 static zend_object_handlers php_runkit_sandbox_object_handlers;
 static zend_class_entry *php_runkit_sandbox_class_entry;
 
@@ -1781,6 +1785,7 @@ int php_runkit_shutdown_sandbox(SHUTDOWN_FUNC_ARGS)
 
 	return SUCCESS;
 }
+#endif // #if 0
 
 /* ***********************
    * Lint Implementation *
@@ -1798,6 +1803,11 @@ static void php_runkit_lint_compile(INTERNAL_FUNCTION_PARAMETERS, int filemode)
 	}
 
 	convert_to_string(zcode);
+	printf("vm_stack_top=%llx\n", (long long)(EG(vm_stack_top)));
+	printf("vm_stack_end=%llx\n", (long long)(EG(vm_stack_end)));
+	printf("vm_stack    =%llx\n", (long long)(EG(vm_stack)));
+	printf("exception    =%llx\n", (long long)(EG(exception)));
+
 
 	context = tsrm_new_interpreter_context();
 	prior_context = tsrm_set_interpreter_context(context);
@@ -1810,6 +1820,7 @@ static void php_runkit_lint_compile(INTERNAL_FUNCTION_PARAMETERS, int filemode)
 		zend_first_try {
 			char *eval_desc;
 			zend_op_array *op_array;
+			printf("before try\nexception    =%llx\n", (long long)(EG(exception)));
 
 			if (filemode) {
 				op_array = compile_filename(ZEND_INCLUDE, zcode TSRMLS_CC);
@@ -1830,11 +1841,25 @@ static void php_runkit_lint_compile(INTERNAL_FUNCTION_PARAMETERS, int filemode)
 			RETVAL_FALSE;
 		} zend_end_try();
 
+		// TODO: catch the exception, destroy it before calling shutdown?
 		php_request_shutdown(NULL);
 	}
+	printf("After exception\n");
+	printf("vm_stack_top=%llx\n", (long long)(EG(vm_stack_top)));
+	printf("vm_stack_end=%llx\n", (long long)(EG(vm_stack_end)));
+	printf("vm_stack    =%llx\n", (long long)(EG(vm_stack)));
+	printf("exception    =%llx\n", (long long)(EG(exception)));
+	fflush(stdout);
 	tsrm_set_interpreter_context(NULL);
 	tsrm_free_interpreter_context(context);
 	tsrm_set_interpreter_context(prior_context);
+	printf("after\n");
+	printf("vm_stack_top=%llx\n", (long long)(EG(vm_stack_top)));
+	printf("vm_stack_end=%llx\n", (long long)(EG(vm_stack_end)));
+	printf("vm_stack    =%llx\n", (long long)(EG(vm_stack)));
+	printf("exception    =%llx\n", (long long)(EG(exception)));
+	fflush(stdout);
+	RETVAL_FALSE;
 }
 /* }}} */
 
